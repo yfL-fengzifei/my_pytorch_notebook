@@ -47,7 +47,6 @@ maxunpool2d
 #Relu
 ReLU函数有个inplace参数，如果设为True，它会把输出直接覆盖到输入中，这样可以节省内存/显存。之所以可以覆盖是因为在计算ReLU的反向传播时，只需根据输出就能够推算出反向传播的梯度。但是只有少数的autograd操作支持inplace操作（如tensor.sigmoid_()），除非你明确地知道自己在做什么，否则一般不要使用inplace操作。
 
-
 """
 
 
@@ -72,6 +71,18 @@ list(layer.parameters())
 
 查看参数的长度
 print(len(params))
+
+"""
+
+"""
+=================================================================================================
+前向传播: __init__
+
+"""
+"""
+def __init__(self,XXX):
+一种是自定义将参数封装成parameter
+parameter是一种特殊的tensor,但其默认是需要求导的，即默认requires_grad=Ture
 
 """
 
@@ -139,7 +150,6 @@ nn.functional 和nn.Module
 """
 
 
-
 """
 =================================================================================================
 损失函数
@@ -202,6 +212,7 @@ optimizer.param_groups
 只有在nn.Sequential()和nn.ModuleList的情况下才会可能有多个组
 """
 
+
 """
 =================================================================================================
 初始化
@@ -213,7 +224,6 @@ pytorch,都采用了较合理的初始化策略，一般不需要考虑，
 import torch.nn import init
 init.xavier_normal_(linear.weight)
 """
-
 
 
 """
@@ -259,7 +269,50 @@ print('10000张测试集中的准确率为: %d %%' % (100 * correct / total))
 
 """
 =================================================================================================
-深入理解...没看
+深入理解nn.Moduel-后面有点没看完
+"""
+"""
+nn.Module基类的构造函数
+def __init__(self):
+    self._parameters=
+    self._module=
+    self._buffers=
+    self._back_hooks=
+    self._forward_hooks=
+    self.training
+
+_parameters: 字典，保存用户直接
+值得注意的是，只有自己定义的parameter会被加入到_parameters字典中，而self.fc=nn.Linear(3,4)则不会加入到_parameters字典中
+_modules:子module，通过self.submodule=nn.Linear(3,4)指定的子module会保存于此
+其他参数没看...???...
+training BN和dropout在训练阶段和测试阶段中采取的策略不同，通过判断training值来决定前向传播策略
+
+值得注意的是：
+1.net=Net()打印出来的只有_modules中定义的层，相当于certain_net._modules()
+2.而net._parameters 打印出来的之后只有自己定义的parameters，也就是在_parameters字典中的参数.
+3.net.parameters()或net.named_parameters()打印出来是整个网络定义的参数
+4.net.named_modules() 如上述一样打印出来的只是submodule中的参数
+
+
+"""
+
+
+"""
+=================================================================================================
+测试阶段
+"""
+"""
+
+#提前设置循环参数
+module.training=False
+module(test_input)
+值得注意的是，虽然可以通过直接设置training属性，来讲子module设为train和eval模式，但是这种方式较为繁琐，因为如果一个模型具有多个dropout层，就需要为每个dropout层指定training。
+
+一般来说：
+调用module.train()函数，将当前module及其子module中的所有training属性设为True
+调用module.eval()函数将training属性都是设置为False
+
+
 """
 
 
@@ -333,10 +386,10 @@ net=Net()
 # output.backward(output) #？？？？
 # optimizer.step()
 
-optimizer=optim.SGD([
-    {'params':net.features.parameters()},
-    {'params':net.classifier.parameters(),'lr':1e-2},
-    ],lr=1e-5
-)
+# optimizer=optim.SGD([
+#     {'params':net.features.parameters()},
+#     {'params':net.classifier.parameters(),'lr':1e-2},
+#     ],lr=1e-5
+# )
 print('pass')
 
