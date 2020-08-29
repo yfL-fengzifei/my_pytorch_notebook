@@ -54,6 +54,7 @@ arrange() 有步长， 左闭右开
 linsapce() 均分切份，左闭右闭
 logspace() log数列，均匀切分，左闭右闭，base为log的底（默认为10）
 rand()/randint()/randn() 均匀[0,1)/[a,b)/标准正态分布
+
 normal/uniform() 正态/均匀分布  （四种模式，张量/标量）
 randperm() 随机排列0~n-1
 full() 自定义元素数值
@@ -175,6 +176,7 @@ a[a>1] 等价于 a.mask_select(a>1)
 
 #certain_tensor.index_select()
 #在指定维度上选取，如选取某行某列,见CSDN
+#在'dL-intopytorch'中‘3_2’有活用index_select和yield的例子
 
 #certain_tensor.nonzero()
 #返回非零元素的下标
@@ -215,7 +217,6 @@ tensor的操作
 #拼接
 cat() 不会增加维度
 stack() 会增加维度
-
 
 #切分
 chunk()
@@ -259,8 +260,8 @@ tensor的矩阵运算
 tracw 迹
 diag 对角线元素
 triu tril 上三角，下三角
-mm bmm 矩阵乘法，batch的矩阵乘法
-mul
+mm bmm 矩阵乘法，batch的矩阵乘法，正经的矩阵乘法
+mul 对应按位相乘
 addmm addbmm addnv addr矩阵运算
 transpose 维度变换
 t 转置 #注意使用contiguous
@@ -318,6 +319,14 @@ tensor的加载与保存
 """
 
 
+"""
+=================================================================================================
+小demo
+"""
+"""
+features = torch.randn(num_examples, num_inputs, dtype=torch.float32)
+等价于features=torch.randn([num_examples,num_inputs],dtype=torch.float32)
+"""
 
 
 

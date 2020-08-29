@@ -169,6 +169,7 @@ nn.certain_loss_function()
 """
 output = net(input)
 # 执行反向传播，注意这里是out是torch.size([1,10]),并不是一个标量，也不是一个损失，所以在执行反向传播的时候，要传入与out大小相同的tensor
+# 注意在y.backword()时，如果y是标量，则不需要为backword()传入任何参数，否则，需要传入一个与y同形的tensor
 # output.backward(torch.ones(1,10))
 
 这点没懂...
@@ -204,6 +205,7 @@ optimizer=optim.SGD([
 )
 
 #梯度清零
+注意grad在反向传播过程中是累加的，这意味着每一次运行反向传播，梯度都会累加之前的梯度，所以一般在反向传播之前需要把梯度清零
 optimizer.zero_grad() 等价于net.zero_grad()
 
 #参数组的概念
@@ -223,6 +225,16 @@ pytorch,都采用了较合理的初始化策略，一般不需要考虑，
 初始化策略用nn.init函数提供
 import torch.nn import init
 init.xavier_normal_(linear.weight)
+"""
+
+
+"""
+=================================================================================================
+超参数
+"""
+"""
+人为设定得参数为超参数，而不是由模型训练得到的。
+一般调参调的就是这些超参数，在少数情况下可以通过模型训练学出来。
 """
 
 

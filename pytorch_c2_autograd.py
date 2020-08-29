@@ -129,6 +129,7 @@ certain_grad=torch.autograd.grad(loss,leaf_tensor,ceate_graph=True)
 在inference,即测试推理时，不需要计算梯度
 即：
 方法一：
+#常用于在模型评估时
 with torch.no_grad():
     pass
 方法二;
