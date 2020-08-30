@@ -1,4 +1,5 @@
-﻿#  概念
+﻿reference https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection.git
+ #  概念
 
  - 目标检测
  - SSD：single-shot detection
