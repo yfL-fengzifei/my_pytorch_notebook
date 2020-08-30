@@ -5,9 +5,6 @@
 image 维度的区别
 tensor\PIL\opencv(一般图像) 中维度是不同的
 """
-"""
-
-"""
 
 
 """
@@ -15,12 +12,15 @@ tensor\PIL\opencv(一般图像) 中维度是不同的
 内置数据集
 """
 """
+torch.utils.data 该模块提供了有关数据处理的工具
+
 import torchvision
 
 torchvision 包含三个部分
-models:提供各种经典的网络结构以及预训练好的模型
-datasets:提供常用的数据集加载，继承于torch.utils.data.Dateset
-transforms：提供常用的预处理皂搓，主要包括对tensor以及PILImage对象的操作
+.models:提供各种经典的网络结构以及预训练好的模型
+.datasets:提供常用的数据集加载，继承于torch.utils.data.Dateset;例子：torchvision.datasets.certain_datasets
+.transforms：提供常用的预处理皂搓，主要包括对tensor以及PILImage对象的操作
+.utils 其他一些有用的方法
 
 certain_dataset=torchvision.dataset.certainset() #返回的是一个Dataset对象，后面还需要跟上DataLoader
 
@@ -28,6 +28,13 @@ resnet34=models.squeezenet1_1(pretrained=True,num_classes=1000)
 #加载预训练好的模型，如果不存在会进行下载
 #预训练好的模型保存在~/.torch/models下面
 
+例子:
+data_train=torchvision.datasets.certain_datasets()
+data_test=torchvision.datasets.certain_datasets()
+访问：
+feature,lable=data_train[0] 数据集返回的是(feature,label)，这里不是一个batch,而是单一图像样本，这里相当于ImageLodaer或自己创建的数据集，后面还需要进行DataLoader
+值得注意的是data_train[0]返回的是一个元组，(tensor(features),int(label_)
+数据集单一样本返回的feature，因为使用了transforms.ToTensor()，所以每个像素的数值为[0.0,1.0]的32浮点数
 """
 
 
@@ -96,8 +103,10 @@ transforms.Lambda封装自定义的转换策略，
 trans=transforms.Lambda(lambda img:img.rotate(random()*360))
 
 transforms.ToTensor() 将数据转换为tensor,会自动归一化自动将[0,255]归一化至[0,1],显示的时候要返回归一化,
+#transforms.ToTensor将(H*W*C)且数据位于[0,255]的PIL的图片或者数据类型为np.uint8的numpy数组转换成尺寸为(C*H*w)且数据类型为torch.float32且位于[0.0,1.0]的tensor
 transform.ToPILImage 将tensor转换成PILImage对象
-#值得注意的是上述的操作定以后都是以函数的形式存在的，需要二次调用
+#值得注意的是上述的操作定义后都是以函数的形式存在的，需要二次调用
+#值得注意的是因为像素值在[0,255]，所以刚好是uint8所能表示的范围，包括transforms.ToTensor在内的一些关于图片的函数就默认输入是uint8类型，若不是，可能不会报错，但是可能得不到想要的效果。因此，如果用像素值(0-255整数)表示图片数据，那么一律将其类型设置成uint8，避免不必要的bug，见文档中的博客
 
 transforms.Normalize(mean,std,inplace_Fasle) 逐channel的对图像进行标准化，（归一化RGB的均值和方差）
 output=(input-mean)/std 加速模型收敛
@@ -144,6 +153,8 @@ data,label=dataset[idx]
 """
 import torch.utils.data as Data
 torch_dataset=Data.TensorDataset(data_tensor=,target_tensor=) #就是将tensor作为数据和标签，而不是img
+将训练数据的特征和标签组合，组合之后，每个dataset[i]返回的就是(data,label)形式
+
 """
 
 
@@ -163,7 +174,7 @@ dataset:加载的数据集(dataset对象)
 batch_size:batch_size
 shuffle:数据打乱
 sampler:样本抽样，定义从数据集中抽取样本的策略,如果指定则忽略shuffle
-num_workers：使用多进程加载的进程数，0表示不适用多进程
+num_workers：使用多进程加载的进程数，0表示不适用多进程，(貌似在Windos中不能使用多进程)
 collate_fn:如何将多个样本数据拼接成一个batch,一般使用默认的拼接方式即可，综合一系列的样本从而形成一个mini-batch张量
 pin_memory:是否将数据保存在pin_memory,pin_memory中的数据转到GPU会快一些
 drop_last:不足,batch丢弃
@@ -192,7 +203,7 @@ for batch_datas,batch_labels in dataloader:
     print(batch_data.size(),batch_labels.size())
 
 不丢弃的方法：没看懂（见'python-book'）
-多进程的问题：没看（见'python-book'）
+多进程的问题：没看（见'python-book'），(貌似在Windos中不能使用多进程)
 
 sampler模块：
 用于对数据进行采样。常用的有随机采样器：randomSampler,当dadalodar的shuffle参数为True时，系统会自动调用这个采样器，实现打乱数据。
