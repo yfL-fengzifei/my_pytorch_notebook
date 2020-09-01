@@ -16,5 +16,13 @@ def create_data_lists(voc07_path,voc12_path,output_folder):
     train_objects=list()
     n_objects=0
 
+    #训练数据
+    for path in [voc07_path,voc12_path]:
+
+        #查找训练数据中图像的ID
+        #.join=path(文件夹的绝对路径)+'ImageSets/Main/trainval.txt'
+        with open(os.path.join(path,'ImageSets/Main/trainval.txt')) as f:
+            pass
+
 
 
