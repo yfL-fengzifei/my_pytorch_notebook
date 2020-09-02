@@ -377,8 +377,27 @@ module(test_input)
 一般来说：
 调用module.train()函数，将当前module及其子module中的所有training属性设为True
 调用module.eval()函数将training属性都是设置为False
+"""
 
+"""
+=================================================================================================
+预训练的模型
+"""
+"""
+pytorch模型子包中，包含了不同模型的定义，对应于不同的任务：分类、检测等
 
+#分类任务
+import torvision.modules as modules
+#利用随机权重构建模型
+certian_model=models.certain_model()
+
+使用预训练的模型
+#预训练的模型使用的是torch.utils.model_zoo
+certain_model=models.certain_model(pretrained=True)
+
+实例化一个预训练的模型，将会将其权重下载到缓存目录中。这个目录可以进行更改设置
+所有的预训练模型，要求输入图像以相同的方式进行归一化，batch*3*H*W,其中H和W至少是224。图像应该加载到[0,1]范围之间，然后利用均值mean=[0.485, 0.456, 0.406],标准差 std=[0.229, 0.224, 0.225]进行归一化
+如何获得这些均值和方法，是利用的ImageNet data数据集进行计算的，具体背后的计算过程见https://pytorch.org/docs/stable/torchvision/models.html
 """
 
 
