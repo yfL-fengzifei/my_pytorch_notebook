@@ -1,4 +1,4 @@
-import json
+# import json
 import xml.etree.ElementTree as ET
 
 """
@@ -51,8 +51,22 @@ json
 
 json是一种轻量级的数据交换格式，
 python 可以使用json模块来对JSON数据进行编解码
+json.dumps() 对数据进行编码
+json.loads() 对数据进行编码
+python->json
+dict->object
+list/tuple->array
+str->string
+int...->number
+true/false->true/false
+none->null
 
-
+json_objet=json.dumps(python_object)
+python_object2=json.loads(json_object2)
+with open('file.json','w') as f:
+    json.dump(data,f)
+with open('file.json','r') as f:
+    data=json.loads(f)
 """
 
 
@@ -65,7 +79,7 @@ def create_label_map():
     label_map={k:v+1 for v,k in enumerate(voc_labels)}
     label_map['background']=0
 
-    return voc_labels,label_map
+    return voc_labels,label_map #返回原始标签和label字典
 
 
 def parse_annotations(annotation_path):

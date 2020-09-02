@@ -1,7 +1,7 @@
 import os
-import torch
+# import torch
 import json
-import xml.etree.ElementTree as ET
+# import xml.etree.ElementTree as ET
 from git_ssd-parse_annotations import create_label_map,parse_annotation
 
 def create_data_lists(voc07_path,voc12_path,output_folder):
@@ -52,14 +52,46 @@ def create_data_lists(voc07_path,voc12_path,output_folder):
     #判断，抛出异常
     assert len(train_objects)==len(train_images)
 
-    #保存成json的形式
+    #保存成json的形式，写入文件
     with open(os.path.join(output_folder,'TRAIN_images.json'),'w') as j:
-        json.dump(train_images,j)
+        json.dump(train_images,j) #train_images为列表，每个元素是图片(其实是路径)
     with open(os.path.join(output_folder,'TRAIN_objects.json'),'w') as j:
-        json.dump(train_objects,j)
+        json.dump(train_objects,j) #train_objects为列表，每个元素是ground-truth字典
     with open(os.path.join(output_folder,'label_map.json'),'w') as j:
-        json.dump(label_map,j)
+        json.dump(label_map,j) #label_map是字典，每个元素为键值对
 
+    print('\nThere are %d training images containing a total of %d objects. File have been saved to %s.'%(len(train_images),n_objects,os.path.abspath(output_folder)))
+
+    #测试数据
+    test_images=list()
+    test_objects=list()
+    n_objects=0
+
+    #查找测试数据中图像的ID
+    #根据原文，值使用voc07中的测试数据
+    with open(os.path.join(voc07_path,'ImageSets/Main/test.txt')) as f:
+        ids=f.read().splitlines()
+
+    for id in ids:
+        #解析xml文件
+        objects=parse_annotation(os.path.join(voc07_path,'Annotation',id+'.xml'))
+
+        if len(objects)==0:
+            continue
+
+        test_objects.append(objects)
+        n_objects+=len(objects)
+        test_images.append(os.path.join(voc07_path,'JPEGImages',id+'.jpg'))
+
+        assert len(test_images)==len(test_images)
+
+    #保存文件
+    with open(os.path.join(output_folder,'TEST_images.json')) as j:
+            json.dump(test_images,j)
+    with open(os.path.join(output_folder,'TEST_objects.json')) as j:
+            json.dump(test_objects,j)
+
+    print('\nThere are %d test images containing a total of %d objects. File have been saved to %s'%(len(test_images),n_objects,os.path.abspath(output_folder)))
 
 
 
