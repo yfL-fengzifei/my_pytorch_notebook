@@ -4,7 +4,9 @@ import xml.etree.ElementTree as ET
 """
 无论是xml还是json,其实就是一种包含了数据以及数据说明的文本格式规范，数据时一样的，不同只是数据的格式(包装数据的不同格式而已)
 """
+
 """
+=================================================================================================
 XML解析
 XML被设计用来传输和存储数据
 python解析XML的三种方法，SAX，DOM，ElementTree
@@ -43,16 +45,34 @@ for object in root.findall(certain_tag)
 
 """
 
-#lable map
-voc_labels = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
-              'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
+"""
+=================================================================================================
+json
 
-#将标签变成整数，值得注意的是label_map是字典的形式
-label_map={k:v+1 for v,k in enumerate(voc_labels)}
-label_map['background']=0
+json是一种轻量级的数据交换格式，
+python 可以使用json模块来对JSON数据进行编解码
+
+
+"""
+
+
+
+def create_label_map():
+    #lable map
+    voc_labels = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable','dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
+
+    #将标签变成整数，值得注意的是label_map是字典的形式
+    label_map={k:v+1 for v,k in enumerate(voc_labels)}
+    label_map['background']=0
+
+    return voc_labels,label_map
 
 
 def parse_annotations(annotation_path):
+
+    #得到lable_map
+    _,label_map=create_label_map()
+
     #解析xml文件
     tree=ET.parse(annotation_path)
     #获得根节点
@@ -94,4 +114,5 @@ def parse_annotations(annotation_path):
 每个模块都有一个__name__属性，当其值为__main__时，表明该模块自身在运行，否则是被引入
 """
 if __name__=='__main__':
+    create_label_map()
     parse_annotations()
