@@ -3,7 +3,7 @@ import torch.utils.data as Data
 import json
 import os
 from PIL import Image
-from git_ssd-transform import *
+import git_ssd-transform as ssd_transform
 
 """
 创建自己的数据集
@@ -66,4 +66,36 @@ class PascalVOCDataset(Data.Dataset):
             difficulties=difficulties[1-difficulties]
 
         #应用转换
+        image,boxes,labels,difficulties=ssd_transform(image,boxes,labels,difficulties,split=self.split)
 
+        return image,boxes,labels,difficulties
+        #有一个很大的问题，这里返回的还是PIL的数据
+
+    def __len__(self):
+        return len(self.images)
+
+    def collate_fn(self,batch): #这个有点没懂...？？？...
+        """
+        因为每个图像包含不同数量的目标，因此需要一个整理功能(传入到DataLoader中)
+        描述如何将不同维度的tensor组合到一起，使用的是list
+
+        值得注意的是该函数可以不定义在该类中，可以单独定义
+
+        batch: 从__getitem__()中得到具有N个元素的迭代对象
+        return: 返回一个batch-images的tensor，一个list，该list包含具有变化尺寸的bbox、labels、difficulties的tensor
+        """
+
+        images=list()
+        boxes=list()
+        labels=list()
+        difficulties=list()
+
+        for b in batch:
+            images.append(b[0])
+            boxes.append(b[1])
+            labels.append(b[2])
+            difficulties.append(b[3])
+
+        images=torch.stack(images,dim=0)
+
+        return images,boxes,labels,difficulties

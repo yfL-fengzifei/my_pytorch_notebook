@@ -250,6 +250,26 @@ def find_intersection(set_1,set_2):
     return intersection_dims[:,:,0]*intersection_dims[:,:,1] #(n1,n2)
 
 
+def flip(image,boxes):
+    """
+    水平翻转
+    image: PIl image
+    boxes: 边界坐标形式，tensor (n_objects,4)
+    return: 翻转后的图像，更新bbox坐标
+    """
+    #翻转图像
+    new_image=FT.hflip(image)
+
+    #翻转bbox
+    #减一可能是跟算法有关，不懂...???...
+    new_boxes=boxes
+    new_boxes[:,:2]=image.width-boxes[:,0]-1
+    new_boxes[:,2:]=image.height-boxes[:,2]-1
+    new_boxes=new_boxes[:,[2,1,0,3]]
+
+    return new_image,new_boxes
+
+
 def resize(image,boxes,dim=(300,300),return_percent_coords=True):
     """
     将图像缩放到(300,300)
@@ -309,6 +329,10 @@ def transform(image,boxes,labels,difficulties,split):
         #值得注意的是，该图像可能进行放大，但是必经过裁切
         #随机裁切图像()缩小
         new_image,new_boxes,new_labels,new_difficulties=random_crop(new_image,new_boxes,new_labels,new_difficulties)
+
+        #翻转图像，概率50%
+        if random.random()<0.5:
+            new_image,new_boxes=flip(new_image,new_boxes)
 
         #将图像缩放到网络定义的需要的尺寸，并将bbox从绝对边界坐标形式，变成分数形式
         new_image,new_boxes=resize(new_image,new_boxes,dims=(300,300))
