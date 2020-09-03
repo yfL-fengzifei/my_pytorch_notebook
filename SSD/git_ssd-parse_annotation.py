@@ -107,7 +107,7 @@ def parse_annotations(annotation_path):
 
         #查找Bbox
         #bbox定义的是左上和右下的坐标
-        #...???...这里为什么要减1，还有数值的问题，[0,1]
+        #...???...这里为什么要减1，还有数值的问题，[0,1],这里貌似先不转换为分数坐标的形式
         bbox=object.find('bndbox')
         xmin=int(bbox.find('xmin').text)-1
         ymin=int(bbox.find('ymin').text)-1
@@ -127,6 +127,6 @@ def parse_annotations(annotation_path):
 一个模块被另一个程序第一次引入的时候，其主程序将被执行。如果想在模块被引入时，模块中的某一程序块不执行，就可以用__name__属性来是该程序块仅在该模块自身运行时执行
 每个模块都有一个__name__属性，当其值为__main__时，表明该模块自身在运行，否则是被引入
 """
-if __name__=='__main__':
-    create_label_map()
-    parse_annotations()
+# if __name__=='__main__':
+#     create_label_map()
+#     parse_annotations()
