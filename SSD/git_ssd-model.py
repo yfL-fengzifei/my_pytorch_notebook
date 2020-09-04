@@ -64,7 +64,7 @@ class VGGBase(nn.Module):
         self.conv3_1=nn.Conv2d(128,256,kernel_size=3,padding=1) #128*75*75 -> 256*75*75
         self.conv3_2=nn.Conv2d(256,256,kernel_size=3,padding=1) #256*75*75 -> 256*75*75
         self.conv3_3=nn.Conv2d(256,256,kernel_size=3,padding=1) #256*75*75 -> 256*75*75
-        self.pool3=nn.MaxPool2d(kernel_size=2,stride=,ceil_mode=True) #对偶数维度使用向上取整的操作 #256*75*75 -> 256*38*38
+        self.pool3=nn.MaxPool2d(kernel_size=2,stride=2,ceil_mode=True) #对偶数维度使用向上取整的操作 #256*75*75 -> 256*38*38
 
         self.conv4_1=nn.Conv2d(256,512,kernel_size=3,padding=1) #256*38*38 -> 512*38*38
         self.conv4_2=nn.Conv2d(512,512,kernel_size=3,padding=1) #512*38*38 -> 512*38*38
@@ -84,6 +84,42 @@ class VGGBase(nn.Module):
         self.load_pretrained_layers()
 
 
+    def forward(self,image):
+        """
+        前向传播
+        :param image: image tensor (n,3,300,300)
+        :return: conv4_3,和 conv7下的低层特征图
+        """
+        out=F.relu(self.conv1_1(image))
+        out=F.relu(self.conv1_2(out))
+        out=self.pool1(out)
+
+        out=F.relu(self.conv2_1(out))
+        out=F.relu(self.conv2_2(out))
+        out=self.pool2(out)
+
+        out=F.relu(self.conv3_1(out))
+        out=F.relu(self.conv3_2(out))
+        out=F.relu(self.conv3_3(out))
+        out=self.pool3(out)
+
+        out=F.relu(self.conv4_1(out))
+        out=F.relu(self.conv4_2(out))
+        out=F.relu(self.conv4_3(out))
+        conv4_3_feats=out #(N,512,38,38)
+        out=self.pool4(out)
+
+        out=F.relu(self.conv5_1(out))
+        out=F.relu(self.conv5_2(out))
+        out=F.relu(self.conv5_3(out))
+        out=self.pool5(out)
+
+        out=F.relu(self.conv6(out))
+        conv7_feats=F.relu(self.conv7(out)) #(N,1024,19,19)
+
+        return conv4_3_feats,conv7_feats
+
+
     def load_pretained_layers(self):
         """
         如原文一样，将在ImageNet任务中预训练的VGG16网络作为基础网络
@@ -98,5 +134,83 @@ class VGGBase(nn.Module):
         pretrained_param_names=list(pretrained_state_dict.keys()) #列出预训练网络的参数的键值的名字
 
         #从预训练的网络中的参数迁移到当前的模型中
+        #想原始预训练过的参数，赋值给自定网络的参数
         for i,param in enumerate(param_names[:-4]): #除了6和7参数
             state_dict[param]=pretrained_state_dict[pretrained_param_names[i]]
+            #值得注意的是，虽然在自定的VGG基础网络中的self.pool3使用的是向上取整，改变了输出的2D维度，但是并没有改变参数量(weights,bias)
+
+            #将fc6和fc7准换为卷积层
+            #fc6
+            conv_fc6_weight=pretrained_state_dict['classifier.0.weight'].view(4096,512,7,7) #(4096,512,7,7)
+            conv_fc6_bias=pretrained_state_dict['classifier.0.bias'] #(4096)
+            state_dict['conv6.weight']=decimate(conv_fc6_weight,m=[4,None,3,3]) #(1024,512,3,3)
+            state_dict['conv6.bias']=decimate(conv_fc6_bias,m=[4]) #(1024)
+
+            #fc7
+            conv_fc7_weight=pretrained_state_dict['classifier.3.weight'].view(4096,4096,1,1)
+            conv_fc7_bias=pretrained_state_dict['classifier.3.bias']
+            state_dict['conv7.weight']=decimate(conv_fc7_weight,m=[4,4,None,None])
+            state_dict['conv7.bias']=decimate(conv_fc6_bias,m=[4])
+
+
+            #经过上述操作，已经修改了self.state_dict, 相当于my_net_dict.update(pretrained_dict);
+            self.load_state_dict(state_dict) #相当于my_net.load_state_dict(my_net_dict)
+
+            print("\nLoaded base model\n")
+
+
+def decimate(tensor,m):
+    """
+    利用因子 m 修改tensor,也就是通过保留每个第m个值来进行降采样
+
+    当将全连接层Fc转换为等价的全卷积层时使用的，但是尺寸更小
+    :param tensor: 要修建的tensor
+    :param m: #修剪因子列表，对应于tensor的每个维度，None表示对该维度不进行修剪
+    :return: 修剪后的tensor
+    """
+    assert tensor.dim()!=len(m) #tensor.dim()表示tensor的维度总数(这里应该是不等于吧)
+    for d in range(tensor.dim()):
+        if m[d] is not None:
+            tensor=tensor.index_select(dim=d,index=torch.arange(start=0,end=tensor.size(d),step=m[d].long()))
+        #这里传入的tensor的维度是tensor.dim()=4
+        #例子, state_dict['conv6.weight']=decimate(conv_fc6_weight,m=[4,None,3,3]) #(4096,512,7,7)。d=0(num_kernel),1(channel),2(h),3(w); m[0]=4,m[1]=None,m[2]=3,m[3]=3
+        #d=0; m[0]=4; tensor.size(0)=4096;
+        #tensor.index_select(dim=0,index=torch.arange(strat=0,end=4096,step=4)) 就是对num_kernel每四个取一个,4096/4=1024,最终得到1024个num_kernel
+        #最终得到的是(1024,512,3,3),因为对原始的tensor已经view过了
+
+    #返回修改过的tensor，这些tensor将作为自定义网络的conv6和conv7的权重和偏置参数
+    return tensor
+
+class AuxiliaryConvolutions(nn.Module):
+    """
+    辅助卷积来生成高层次特征
+    """
+    def __init__(self):
+        super(AuxiliaryConvolutions,self).__init__()
+
+        #注意默认stride=1
+        self.conv8_1=nn.Conv2d(1024,256,kernel_size=1,padding=0) #1024*19*19 -> 256*19*19
+        self.conv8_2=nn.Conv2d(256,512,kernel_size=3,stride=2,padding=1) #256*19*19 -> 512*10*10
+
+        self.conv9_1=nn.Conv2d(512,128,kernel_size=1,padding=0) #512*7*7 -> 128*10*10
+        self.conv9_2=nn.Conv2d(128,256,kernel_size=3,stride=2,padding=1) #128*10*10 -> 256*5*5
+
+        self.conv10_1=nn.Conv2d(256,128,kernel_size=1,padding=0) #256*5*5-> 256*5*5
+        self.conv10_2=nn.Conv2d(128,256,kernel_size=3,padding=0) #256*5*5 -> 256*3*3
+
+        self.conv11_1 = nn.Conv2d(256, 128, kernel_size=1, padding=0) #256*3*3 -> 128*3*3
+        self.conv11_2 = nn.Conv2d(128, 256, kernel_size=3, padding=0) #128*3*3 -> 256*1*1
+
+        #初始化卷积参数
+        self.init_conv2d()
+
+        def int_conv2d(self):
+            """
+            初始化卷积参数
+            :param self:
+            :return:
+            """
+
+
+
+
