@@ -174,8 +174,9 @@ a[a>1] #只把满足要求的返回成一个list
 #certain_tensor.mask_select()
 a[a>1] 等价于 a.mask_select(a>1)
 
-#certain_tensor.index_select()
+#certain_tensor.index_select(dim=,index=)
 #在指定维度上选取，如选取某行某列,见CSDN
+#就是根据dim索引index(以tensor中定义的)，
 #在'dL-intopytorch'中‘3_2’有活用index_select和yield的例子
 
 #certain_tensor.nonzero()
