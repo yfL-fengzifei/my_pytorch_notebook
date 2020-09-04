@@ -67,7 +67,7 @@ import torch.utils.data as data
 #         img_path=self.imgs[index]
 #         label = 1 if 'dog' in img_path.split('/')[-1] else 0
 #         pil_img=Image.open(img_path)
-#         array=np.asarray(pil_img) #不会占用新的内存
+#         array=np.array(pil_img) #不会占用新的内存
 #         data=torch.from_numpy(array)
 #         return data,label
 #

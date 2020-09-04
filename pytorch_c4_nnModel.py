@@ -19,6 +19,7 @@ nn.init 参数初始化方法
 nn.Nodule
 """
 """
+https://zhuanlan.zhihu.com/p/88712978(好多没看)
 torch.nn的核心数据结构是Module,其是一个抽象的概念，即可以表示某个层，也可以表示包含很多层的神经网络
 nn.Module:
 parameters:存储管理nn.Parameters类
@@ -66,11 +67,34 @@ for parameter in net.parameters()
 对于 子Module 中的parameter，会其名字之前加上当前Module的名字。如对于`self.sub_module = SubModel()`，SubModel中有个parameter的名字叫做param_name，
 那么二者拼接而成的parameter name 就是`sub_module.param_name`
 
-
 list(layer.parameters())
 
 查看参数的长度
 print(len(params))
+
+对于参数parameters,可以使用for param in module.parameters()来遍历网络模型中的参数，因为该函数返回的是一个迭代器iterator。在使用优化算法的时候就是讲model.parameters()传给Optimizer，与之类似的还有函数buffers、children、modules
+for name,param in model.named_parameters()
+for name,buf in model.named_buffers()
+for name,module in model.named_chlidren()
+for name,modle in model.named_modules()
+
+
+#使用state_dict来访问所有的参数
+state_dict的作用是返回一个包含module的所有state的dictionary，而这个字典的keys对应的是parameter和buffer的名字names。(该函数的源码部分有一个循环可以递归遍历Module中所有的SubModule)
+import torch
+import torch.nn as nn
+#net=nn.certain_module()
+net=nn.Linear(2,2)
+#查看该module中的所有state,返回的是一个字典OrderedDict()
+print(net.state_dict())
+#查看键值
+print(net.state_dict().keys())
+
+net2=nn.Sequential(nn.Linear(2,2),nn.Linear(2,2))
+#查看该module的所有state
+print(net2.state_dict())
+#查看键值
+print(net2.state_dict().keys())
 
 """
 
@@ -123,6 +147,26 @@ net[i].weights
 net[i].bias
 
 值得注意的是，只有是利用nn.Sequential()或nn.ModuleList()声明的网络，才可以利用net[i]索引的方式访问具体的层或子网络，而利用class声明的网络，只能利用net.certain_layer的方式进行访问,即net.certian_layer.weights、net.certain_layer.bias
+
+使用state_dict来访问所有的参数
+state_dict的作用是返回一个包含module的所有state的dictionary(OrderDict)，而这个字典的keys对应的是parameter和buffer的名字names。(该函数的源码部分有一个循环可以递归遍历Module中所有的SubModule)
+import torch
+import torch.nn as nn
+#net=nn.certain_module()
+net=nn.Linear(2,2)
+#查看该module中的所有state,返回的是一个字典OrderedDict()
+print(net.state_dict())
+#查看键值
+print(net.state_dict().keys())
+
+net2=nn.Sequential(nn.Linear(2,2),nn.Linear(2,2))
+#查看该module的所有state
+print(net2.state_dict())
+#查看键值
+print(net2.state_dict().keys())
+#循环查看
+for name in model.state_dict():
+    print(name,model.state_dict()[name]m,model.state_dict()[name].size())
 """
 
 
@@ -260,7 +304,7 @@ optimizer.zero_grad() 等价于net.zero_grad()
 
 #参数组的概念
 optimizer有一个参数组的性质
-optimizer.param_groups；只有在nn.Sequential()和nn.ModuleList的情况下才会可能有多个组,才class中也可以使用sequential 和ModuleList
+optimizer.param_groups；只有在nn.Sequential()和nn.ModuleList的情况下才会可能有多个组,在class中也可以使用sequential 和ModuleList
 方法1：就该optimizer.param_groups中对应的学习率，（不推荐）
 方法2：新建一个优化器，由于optimizer十分轻量级，构建开销很小，因此可以创建一个optimizer，但是后者对于使用动量的优化器Adam,会丢失动量等状态信息，可能会造成损失函数的收敛出现震荡等情况，...???...没懂
 """
@@ -306,12 +350,25 @@ net2=torch.load('net.pkl')
 
 法二：
 # 只保留计算图中节点的参数，效果更快
+#state_dict()的作用见上述’查看参数一节‘
 torch.save(net.state_dict(),'net_param.pkl')
 # 首先先建立与训练时一模一样的网络
 class pass
 net3=Net()
-net3.load_state_dict(torch.load('net_param.pkl'))
+net3.load_state_dict(torch.load('net_param.pkl')) #load_state_dict的作用于state_dict的作用相反，将parameter和buffer加载到module和SubModule中
+
+#加载预训练模型
+import torchvision.models as models
+pretrained_network=models.certian_network(pretrained=True)
+#预训练的模型的参数
+pretrained_dict=pretrained_network.state_dict()
+
+#从网络上下载
+import torch.utils.model_zoo as model_zoo
+state_dict=model.zoo.load_ulr() #从给定URL处下载torch序列化对象，如果要下载的文件是压缩包，将自动解压缩
+
 """
+
 
 """
 =================================================================================================
@@ -347,7 +404,7 @@ def __init__(self):
     self._forward_hooks=
     self.training
 
-_parameters: 字典，保存用户直接
+_parameters: 字典，保存用户直接定义的参数，self.param=nn.Parameter(torch.tensor([1,2,3]))
 值得注意的是，只有自己定义的parameter会被加入到_parameters字典中，而self.fc=nn.Linear(3,4)则不会加入到_parameters字典中
 _modules:子module，通过self.submodule=nn.Linear(3,4)指定的子module会保存于此
 其他参数没看...???...
@@ -357,9 +414,10 @@ training BN和dropout在训练阶段和测试阶段中采取的策略不同，�
 1.net=Net()打印出来的只有_modules中定义的层，相当于certain_net._modules()
 2.而net._parameters 打印出来的之后只有自己定义的parameters，也就是在_parameters字典中的参数.
 3.net.parameters()或net.named_parameters()打印出来是整个网络定义的参数
-4.net.named_modules() 如上述一样打印出来的只是submodule中的参数
+4.net.named_modules() 如上述一样打印出来的只是submodule中的参数 值得注意的是，这里是递归返回，从外层module到内层module
 
-
+for name,buf in model.named_buffers()
+for name,module in model.named_chlidren() #没有递归操作
 """
 
 
@@ -368,7 +426,6 @@ training BN和dropout在训练阶段和测试阶段中采取的策略不同，�
 测试阶段
 """
 """
-
 #提前设置循环参数
 module.training=False
 module(test_input)

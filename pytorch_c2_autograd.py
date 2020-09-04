@@ -173,11 +173,6 @@ torch.autograd.grad(z,y)
 """
 
 
-
-
-
-
-
 # def abs(x):
 #     if x.data[0]>0:
 #         return x
