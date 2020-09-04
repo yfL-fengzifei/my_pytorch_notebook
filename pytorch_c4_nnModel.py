@@ -367,6 +367,19 @@ pretrained_dict=pretrained_network.state_dict()
 import torch.utils.model_zoo as model_zoo
 state_dict=model.zoo.load_ulr() #从给定URL处下载torch序列化对象，如果要下载的文件是压缩包，将自动解压缩
 
+#加载部分预训练的模型
+#这里只是给个例子
+my_net=Net()
+pretrained_network=models.certain_network(pretrained=True)
+pretrained_dict=pretrianed_network.state_dict()
+my_net_dict=my_net.state.dict()
+#将预训练模型中的参数不属于自定义模型结构的键值删除
+pretrained_dict={k:v for k,v in pretrained_dict() if k in my_net_dict} #这里完全是利用键名进行约束的
+#更新自定的网络参数
+my_net_dict.update(pretrained_dict)
+#加载真正的参数
+my_net._dictload_state_dict(my_net_dict)
+
 """
 
 
