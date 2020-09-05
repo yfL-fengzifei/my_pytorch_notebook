@@ -417,7 +417,8 @@ class SSD300(nn.Module):
         for k,fmap in enumerate(fmaps): #某一特征图
             for i in range(fmap_dims[fmap]): #高(列)
                 for j in range(fmap_dims[fmap]): #宽(行)
-                    #中心坐标
+
+                    #中心坐标形式
                     cx=(j+0.5)/fmap_dims[fmap] #除以特征图维度是因为将坐标转换为分数的形式
                     cy=(i+0.5)/fmap_dims[fmap]
 
@@ -454,6 +455,7 @@ class SSD300(nn.Module):
         conv4_3_feats,conv7_feats=self.base(image)
 
         #对conv4_3进行操作
+        #这么做的意义没懂...???...
         norm=conv4_3_feats.pow(2).sum(dim=1,keepdim=True).sqrt() #(n,512,38,38)-> (n,1,38,38)
         conv4_3_feats=conv4_3_feats/norm #(n,512,38,38)
         conv4_3_feats=conv4_3_feats*self.rescale_factors #(n,512,38,38) 广播机制
@@ -484,6 +486,8 @@ class SSD300(nn.Module):
         batch_size=predicted_locs.size(0)
         n_priors=self.priors_cxcy.size(0)
         predicted_scores=F.softmax(predicted_scores,dim=2)
+        pass
+
 
 
 
