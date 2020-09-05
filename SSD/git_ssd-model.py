@@ -207,9 +207,286 @@ class AuxiliaryConvolutions(nn.Module):
         def int_conv2d(self):
             """
             初始化卷积参数
-            :param self:
-            :return:
             """
+            for c in self.children():
+                if isinstance(c,nn.Conv2d):
+                    nn.init.xavier_uniform_(c.weight)
+                    nn.init.constant_(c.bias,0.)
+
+    def forward(self,conv7_feats):
+        """
+        前向传播
+        :param conv7_feats: 将conv7_feats特征图作为辅助网络的参数,低层次特征图，tensor (N,1024,19,19)
+        :return: 更高层次的特征图，conv8_2,conv9_2,conv10_2,conv11_2
+        """
+        out=F.relu(self.conv8_1(conv7_feats))
+        out=F.relu(self.conv8_2(out))
+        conv8_2_feats=out
+
+        out=F.relu(self.conv9_1(out))
+        out=F.relu(self.conv9_2(out))
+        conv9_2_feats=out
+
+        out=F.relu(self.conv10_1(out))
+        out=F.relu(self.conv10_2(out))
+        conv10_2_feats=out
+
+        out=F.relu(self.conv11_1(out))
+        conv11_2_feats=F.relu(self.conv11_2(out))
+
+        return conv8_2_feats,conv9_2_feats,conv10_2_feats,conv11_2_feats
+
+class PredictionConvolutions(nn.Module):
+    """
+    利用低层和高层特征图来预测类别得分和Bbox
+
+    bbox(位置)以编码后的偏移量的方式(给出)进行预测，该偏移量相对于8732个先验框(默认框)中的每一个
+    ‘cxcy_to_gcxgcy’
+
+    类别得分表示的是，8732个定位到的bbox的每个目标的类别得分,注意这里不是8732个先验框中的目标而是，经过预测偏移量后的Bbox中的目标的类别
+    """
+    def __init__(self,n_classes):
+        """
+        :param n_classes: 目标的类别数量
+        """
+        super(PredictionConvolutions, self).__init__()
+
+        self.n_classes=n_classes
+
+        #每个特征图下每个位置定义的先验框的数量
+        #number表示使用n个横纵比
+        n_boxes={'conv4_3':4,
+                 'conv7':6,
+                 'conv8_2':6,
+                 'conv9_2':6,
+                 'conv10_2':4,
+                 'conv11_2':4}
+
+        #位置预测卷积，预测的是偏移量，
+        self.loc_conv4_3=nn.Conv2d(512,n_boxes['conv4_3']*4,kernel_size=3,padding=1) #->16*38*38
+        self.loc_conv7=nn.Conv2d(1024,n_boxes['conv7']*4,kernel_size=3,padding=1) #->24*19*19
+        self.loc_conv8_2=nn.Conv2d(512,n_boxes['conv8_2']*4,kernel_size=3,padding=1)
+        self.loc_conv9_2=nn.Conv2d(256,n_boxes['conv9_2']*4,kernel_size=3,padding=1)
+        self.loc_conv10_2=nn.Conv2d(256,n_boxes['conv10_2']*4,kernel_size=3,padding=1)
+        self.loc_conv11_2=nn.Conv2d(256,n_boxes['conv11_2']*4,kernel_size=3,padding=1)
+
+        #分类预测卷积，预测位置框(先验框)中的目标的类别
+        self.cl_conv4_3=nn.Conv2d(512,n_boxes['conv11_2']*n_classes,kernel_size=3,padding=1) #->(4*n_classes)*38*38
+        self.cl_conv7=nn.Conv2d(1024,n_boxes['conv7']*n_classes,kernel_size=3,padding=1)
+        self.cl_conv8_2=nn.Conv2d(512,n_boxes['conv8_2']*n_classes,kernel_size=3,padding=1)
+        self.cl_conv9_2=nn.Conv2d(256,n_boxes['conv9_2']*n_classes,kernel_size=3,padding=1)
+        self.cl_conv10_2=nn.Conv2d(256,n_boxes['conv10_2']*n_classes,kernel_size=3,padding=1)
+        self.cl_conv11_2=nn.Conv2d(256,n_boxes['conv11_2']*n_classes,kernel_size=3,padding=1)
+
+        #初始化卷积参数
+        self.init_conv2d()
+
+    def init_conv2d(self):
+        """
+        初始化卷积参数
+        """
+        for c in self.children():
+            if isinstance(c,nn.Conv2d):
+                nn.init.xavier_uniform_(c.weight)
+                nn.init.constant_(c.bias,0.)
+
+    def forward(self,conv4_3_feats,conv7_feats,conv8_2_feats,conv9_2_feats,conv10_2_feats,conv11_2_feats):
+        """
+        前向传播
+        :param conv4_3_feats: a tensor of dimensions (N, 512, 38, 38)
+        :param conv7_feats: a tensor of dimensions (N, 1024, 19, 19)
+        :param conv8_2_feats: a tensor of dimensions (N, 512, 10, 10)
+        :param conv9_2_feats: a tensor of dimensions (N, 256, 5, 5)
+        :param conv10_2_feats: a tensor of dimensions (N, 256, 3, 3)
+        :param conv11_2_feats: a tensor of dimensions (N, 256, 1, 1)
+        :return: 8732个Bbox和对应的得分，即，每个图像中相对于每个先验框的偏移量(预测后的Bbox以偏移量的方式给出，以及Bbox中的目标的得分)
+        """
+
+        batch_size=conv4_3_feats.size(0)
+
+        #这里边预测位置框(相对于先验框的偏移量)没什么规则，就是硬(传统)卷积
+
+        #预测定位框(bbox)的边界(即相对于先验框的偏移量)
+        l_conv4_3=self.loc_conv4_3(conv4_3_feats)
+        l_conv4_3=l_conv4_3.permute(0,2,3,1).contiguous() #tensor.permute()转换维度，tensor.contiguous()保证tensor是一块连续的内存,便于后面的.view(); 原来是(n,16*38*38),现在是(n,38*38*16)
+        l_conv4_3=l_conv4_3.view(batch_size,-1,4) #(N,5776,4) 一共有5776个boxes
+
+        l_conv7=self.loc_conv7(conv7_feats) #(N,24*19*19)
+        l_conv7=l_conv7.permute(0,2,3,1).contiguous() #(N,19*19*24)
+        l_conv7=l_conv7.view(batch_size,-1,4) #(n,2166,4) 一共有2166个boxes
+
+        l_conv8_2 = self.loc_conv8_2(conv8_2_feats)  # (N, 24, 10, 10)
+        l_conv8_2 = l_conv8_2.permute(0, 2, 3, 1).contiguous()  # (N, 10, 10, 24)
+        l_conv8_2 = l_conv8_2.view(batch_size, -1, 4)  # (N, 600, 4)
+
+        l_conv9_2 = self.loc_conv9_2(conv9_2_feats)  # (N, 24, 5, 5)
+        l_conv9_2 = l_conv9_2.permute(0, 2, 3, 1).contiguous()  # (N, 5, 5, 24)
+        l_conv9_2 = l_conv9_2.view(batch_size, -1, 4)  # (N, 150, 4)
+
+        l_conv10_2 = self.loc_conv10_2(conv10_2_feats)  # (N, 16, 3, 3)
+        l_conv10_2 = l_conv10_2.permute(0, 2, 3, 1).contiguous()  # (N, 3, 3, 16)
+        l_conv10_2 = l_conv10_2.view(batch_size, -1, 4)  # (N, 36, 4)
+
+        l_conv11_2 = self.loc_conv11_2(conv11_2_feats)  # (N, 16, 1, 1)
+        l_conv11_2 = l_conv11_2.permute(0, 2, 3, 1).contiguous()  # (N, 1, 1, 16)
+        l_conv11_2 = l_conv11_2.view(batch_size, -1, 4)  # (N, 4, 4)
+
+        #预测位置框中的目标类别
+        c_conv4_3=self.cl_conv4_3(conv4_3_feats) #(n,4*n_classes,38,38)
+        c_conv4_3=c_conv4_3.permute(0,2,3,1).contiguous() #(n,38,38,4*n_classes)
+        c_conv4_3=c_conv4_3.view(batch_size,-1,self.n_classes)
+
+        c_conv7 = self.cl_conv7(conv7_feats)  # (N, 6 * n_classes, 19, 19)
+        c_conv7 = c_conv7.permute(0, 2, 3, 1).contiguous()  # (N, 19, 19, 6 * n_classes)
+        c_conv7 = c_conv7.view(batch_size, -1,self.n_classes)  # (N, 2166, n_classes), there are a total 2116 boxes on this feature map
+
+        c_conv8_2 = self.cl_conv8_2(conv8_2_feats)  # (N, 6 * n_classes, 10, 10)
+        c_conv8_2 = c_conv8_2.permute(0, 2, 3, 1).contiguous()  # (N, 10, 10, 6 * n_classes)
+        c_conv8_2 = c_conv8_2.view(batch_size, -1, self.n_classes)  # (N, 600, n_classes)
+
+        c_conv9_2 = self.cl_conv9_2(conv9_2_feats)  # (N, 6 * n_classes, 5, 5)
+        c_conv9_2 = c_conv9_2.permute(0, 2, 3, 1).contiguous()  # (N, 5, 5, 6 * n_classes)
+        c_conv9_2 = c_conv9_2.view(batch_size, -1, self.n_classes)  # (N, 150, n_classes)
+
+        c_conv10_2 = self.cl_conv10_2(conv10_2_feats)  # (N, 4 * n_classes, 3, 3)
+        c_conv10_2 = c_conv10_2.permute(0, 2, 3, 1).contiguous()  # (N, 3, 3, 4 * n_classes)
+        c_conv10_2 = c_conv10_2.view(batch_size, -1, self.n_classes)  # (N, 36, n_classes)
+
+        c_conv11_2 = self.cl_conv11_2(conv11_2_feats)  # (N, 4 * n_classes, 1, 1)
+        c_conv11_2 = c_conv11_2.permute(0, 2, 3, 1).contiguous()  # (N, 1, 1, 4 * n_classes)
+        c_conv11_2 = c_conv11_2.view(batch_size, -1, self.n_classes)  # (N, 4, n_classes)
+
+        #一共8732个boxes
+        #用特定的顺序连接 (必须与先验框的顺序进行匹配)
+        locs=torch.cat([l_conv4_3,l_conv7,l_conv8_2,l_conv9_2,l_conv10_2,l_conv11_2],dim=1) #(N,8732,4)
+        class_scores=torch.cat([c_conv4_3,c_conv7,c_conv8_2,c_conv9_2,c_conv10_2,c_conv11_2],dim=1) #(N,8732,n_classses)
+
+        return locs,class_scores
+
+
+class SSD300(nn.Module):
+    """
+    封装VGGBase,辅助网络，预测卷积
+    """
+    def __init__(self,n_classes):
+        super(SSD300,self).__init__()
+        self.n_classes=n_classes
+
+        self.base=VGGBase() #相当于实例化的基础网络
+        self.aux_convs=AuxiliaryConvolutions() #相当于实例化了辅助网络
+        self.pred_convs=PredictionConvolutions() #相当于实例化了预测网络 #操作的时候就是硬卷积
+
+        #因为低层次特征图(conv4_3)有相当大的尺度，因此利用L2正则化和重缩放，重缩放因子初始设置为20，但是在反向传播中每个通道中的重缩放因子是可以学习的
+        self.rescale_factors=nn.Parameter(torch.FloatTensor(1,512,1,1)) #因为要学习，所以在__init__中预测
+        nn.init.constant_(self.rescale_factors,20)
+
+        #创建先验框
+        self.priors_cxcy=self.create_prior_boxes()
+
+
+    def create_prior_boxes(self):
+        """
+        对模型创建8732个先验框(默认框)
+        :return: 以中心坐标形式返回的先验框, tensor (8732,4)
+        """
+        fmap_dims={'conv4_3':38,
+                   'conv7':19,
+                   'conv8_2':10,
+                   'conv9_2':5,
+                   'conv10_2':3,
+                   'conv11_2':1}
+
+        obj_scales= {'conv4_3': 0.1,
+                     'conv7': 0.2,
+                     'conv8_2': 0.375,
+                     'conv9_2': 0.55,
+                     'conv10_2': 0.725,
+                     'conv11_2': 0.9}
+
+        aspect_ratios= {'conv4_3': [1.,2.,0.5],
+                     'conv7': [1.,2.,3.,0.5,.333],
+                     'conv8_2': [1.,2.,3.,0.5,.333],
+                     'conv9_2': [1.,2.,3.,0.5,.333],
+                     'conv10_2': [1.,2.,0.5],
+                     'conv11_2': [1.,2.,0.5]}
+
+        fmaps=list(fmap_dims.keys())
+
+        prior_boxes=[]
+
+        for k,fmap in enumerate(fmaps): #某一特征图
+            for i in range(fmap_dims[fmap]): #高(列)
+                for j in range(fmap_dims[fmap]): #宽(行)
+                    #中心坐标
+                    cx=(j+0.5)/fmap_dims[fmap] #除以特征图维度是因为将坐标转换为分数的形式
+                    cy=(i+0.5)/fmap_dims[fmap]
+
+                    for ratio in aspect_ratios[fmap]: #特征图对应的横纵比,list[]
+                        prior_boxes.append([cx,cy,obj_scales[fmap]*sqrt(ratio),obj_scales[fmap]/sqrt(ratio)]) #w=s*sqrt(ratio),h=s/sqrt(ratio)
+                        #每个特征图，从左到右，从上到下，在每个位置上生成多个具有不同横纵比的先验框
+
+                        #额外的先验框
+                        if ratio==1:
+                            #捕捉异常使用的是try/except语句，用来检测try语句中的错误，从而让except语句补货异常信息并处理
+                            try: #先执行，异常时交给expect处理
+                                additional_scale=sqrt(obj_scales[fmap]*obj_scales[fmaps[k+1]])
+                            #对于最后一个特征图，没有下一个特征图
+                            except ImportError:
+                                additional_scale=1.
+                            prior_boxes.append([cx,cy,additional_scale,additional_scale])
+
+        prior_boxes=torch.FloatTensor(prior_boxes).to(device)
+
+        prior_boxes.clamp_(0,1) #加紧到0,1之间，即超出图像边界的被修剪
+
+        #值得注意的是，从一开始就是以小数形式表示的先验框坐标(中心点的形式)
+        return prior_boxes #(8732,4)
+
+
+    def forward(self,image):
+        """
+        前向传播
+        :param image: tensor (n,3,300,300)
+        :return: 每个图像生成8732个位置和得分
+        """
+
+        #执行VGG网络，得到低层特征图
+        conv4_3_feats,conv7_feats=self.base(image)
+
+        #对conv4_3进行操作
+        norm=conv4_3_feats.pow(2).sum(dim=1,keepdim=True).sqrt() #(n,512,38,38)-> (n,1,38,38)
+        conv4_3_feats=conv4_3_feats/norm #(n,512,38,38)
+        conv4_3_feats=conv4_3_feats*self.rescale_factors #(n,512,38,38) 广播机制
+
+        #执行辅助卷积，得到高层特征图
+        conv8_2_feats,conv9_2_feats,conv10_2_feats,conv11_2_feats=self.aux_convs(conv7_feats)
+
+        #执行预测卷积（对每个结果位置框预测相对于先验框的偏移量和类别）
+        #就是硬卷积
+        locs,classes_scores=self.pred_convs(conv4_3_feats,conv8_2_feats,conv9_2_feats,conv10_2_feats,conv11_2_feats)
+
+        return locs,classes_scores #(n,8732,4) (n,8732,n_classes)
+
+
+    def detect_objects(self,predicted_locs,predicted_scores,min_score,max_overlap,top_k):
+        """
+        将SSD300的输出，即8732个位置输出(相对于先验框的偏移量)和类别得分，将其解码，从而检测目标
+
+        对于每个类别，执行NMS
+
+        :param predicted_locs: 预测到的相对于先验框的位置框(偏移量，其实就是4个值)，tensor (n,8732,4)
+        :param predicted_scores: 每个进过编码后的位置框(偏移量)下的类别得分，tensor (n,8732,n_classes)
+        :param min_score: 对于某个特定类别的，box与之匹配的最小得分阈值
+        :param max_overlap: 两个boxes之间的最大IOU，低于这个值得不会被进行NMS抑制
+        :param top_k: 如果所有的类别都出现了，那么值保留前k类目标
+        :return: 检测结果(位置框，标签，得分) list
+        """
+        batch_size=predicted_locs.size(0)
+        n_priors=self.priors_cxcy.size(0)
+        predicted_scores=F.softmax(predicted_scores,dim=2)
+
+
+
 
 
 
