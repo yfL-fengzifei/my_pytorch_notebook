@@ -341,6 +341,8 @@ init.constant_(net.certain_layer.learnable_param,val=) 将参数设为常数，�
 模型保存与加载
 """
 """
+模型保存的格式是，.pkl,.pt,.pth 这几种格式都没有什么区别
+
 法一：
 # class pass
 # training_loop pass
