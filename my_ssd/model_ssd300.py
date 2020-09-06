@@ -1,12 +1,14 @@
-import model_VGGbase
-import model_aux
-import model_pre
+from model_VGGbase import *
+from model_aux import *
+from model_pre import *
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from math import sqrt
 import torchvision
+
+device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class SSD300(nn.Module):
     """
@@ -18,7 +20,7 @@ class SSD300(nn.Module):
 
         self.base=VGGBase() #相当于实例化的基础网络
         self.aux_convs=AuxiliaryConvolutions() #相当于实例化了辅助网络
-        self.pred_convs=PredictionConvolutions() #相当于实例化了预测网络 #操作的时候就是硬卷积
+        self.pred_convs=PredictionConvolutions(n_classes) #相当于实例化了预测网络 #操作的时候就是硬卷积
 
         #因为低层次特征图(conv4_3)有相当大的尺度，因此利用L2正则化和重缩放，重缩放因子初始设置为20，但是在反向传播中每个通道中的重缩放因子是可以学习的
         self.rescale_factors=nn.Parameter(torch.FloatTensor(1,512,1,1)) #因为要学习，所以在__init__中预测
@@ -47,12 +49,12 @@ class SSD300(nn.Module):
                      'conv10_2': 0.725,
                      'conv11_2': 0.9}
 
-        aspect_ratios= {'conv4_3': [1.,2.,0.5],
-                     'conv7': [1.,2.,3.,0.5,.333],
-                     'conv8_2': [1.,2.,3.,0.5,.333],
-                     'conv9_2': [1.,2.,3.,0.5,.333],
-                     'conv10_2': [1.,2.,0.5],
-                     'conv11_2': [1.,2.,0.5]}
+        aspect_ratios = {'conv4_3': [1., 2., 0.5],
+                         'conv7': [1., 2., 3., 0.5, .333],
+                         'conv8_2': [1., 2., 3., 0.5, .333],
+                         'conv9_2': [1., 2., 3., 0.5, .333],
+                         'conv10_2': [1., 2., 0.5],
+                         'conv11_2': [1., 2., 0.5]}
 
         fmaps=list(fmap_dims.keys())
 
@@ -67,18 +69,19 @@ class SSD300(nn.Module):
                     cy=(i+0.5)/fmap_dims[fmap]
 
                     for ratio in aspect_ratios[fmap]: #特征图对应的横纵比,list[]
-                        prior_boxes.append([cx,cy,obj_scales[fmap]*sqrt(ratio),obj_scales[fmap]/sqrt(ratio)]) #w=s*sqrt(ratio),h=s/sqrt(ratio)
+                        prior_boxes.append([cx, cy, obj_scales[fmap] * sqrt(ratio),
+                                            obj_scales[fmap] / sqrt(ratio)])  # w=s*sqrt(ratio),h=s/sqrt(ratio)
                         #每个特征图，从左到右，从上到下，在每个位置上生成多个具有不同横纵比的先验框
 
                         #额外的先验框
                         if ratio==1:
                             #捕捉异常使用的是try/except语句，用来检测try语句中的错误，从而让except语句补货异常信息并处理
                             try: #先执行，异常时交给expect处理
-                                additional_scale=sqrt(obj_scales[fmap]*obj_scales[fmaps[k+1]])
+                                additional_scale = sqrt(obj_scales[fmap] * obj_scales[fmaps[k + 1]])
                             #对于最后一个特征图，没有下一个特征图
-                            except ImportError:
+                            except IndexError:
                                 additional_scale=1.
-                            prior_boxes.append([cx,cy,additional_scale,additional_scale])
+                            prior_boxes.append([cx, cy, additional_scale, additional_scale])
 
         prior_boxes=torch.FloatTensor(prior_boxes).to(device)
 
@@ -109,7 +112,7 @@ class SSD300(nn.Module):
 
         #执行预测卷积（对每个结果位置框预测相对于先验框的偏移量和类别）
         #就是硬卷积
-        locs,classes_scores=self.pred_convs(conv4_3_feats,conv8_2_feats,conv9_2_feats,conv10_2_feats,conv11_2_feats)
+        locs,classes_scores=self.pred_convs(conv4_3_feats,conv7_feats,conv8_2_feats,conv9_2_feats,conv10_2_feats,conv11_2_feats)
 
         return locs,classes_scores #(n,8732,4) (n,8732,n_classes)
 
@@ -132,3 +135,6 @@ class SSD300(nn.Module):
         predicted_scores=F.softmax(predicted_scores,dim=2)
         pass
 
+# if __name__=='__main__':
+#     ssd300=SSD300(20)
+#     print(ssd300)
