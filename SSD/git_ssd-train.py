@@ -5,9 +5,11 @@ import torch.utils.data as Data
 from git_ssd-datasets import PascalVOCDataset
 from git_ssd-transform import SSD300,MultiBosLoss
 
+
 #数据参数
 data_folder='./'
 keep_difficult=True
+
 
 def main():
     """
