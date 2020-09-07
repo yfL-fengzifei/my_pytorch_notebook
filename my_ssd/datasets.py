@@ -46,8 +46,10 @@ class PascalVOCDataset(Data.Dataset):
         # json文件中是由list得来的
         with open(os.path.join(data_folder, self.split + '_images.json'), 'r') as j:
             self.images = json.load(j)  # json.load用来读取文件，json.laods用来读取字符串
+            # self.images是数据集中的所有路径
         with open(os.path.join(data_folder, self.split + '_objects.json'), 'r') as j:
             self.objects = json.load(j)
+            # self.objects是数据集中的每个图像对应的目标真值字典
 
         assert len(self.images) == len(self.objects)
         # images每个元素包含的是一个图像路径，注意这里保存的路径是绝对路径
@@ -73,13 +75,12 @@ class PascalVOCDataset(Data.Dataset):
         # 应用转换
         image, boxes, labels, difficulties = transform(image, boxes, labels, difficulties, split=self.split)
 
-        return image, boxes, labels, difficulties
-        # 有一个很大的问题，这里返回的还是PIL的数据
+        return image, boxes, labels, difficulties  # 返回的是一张图像、及其图像中对应的objects
 
     def __len__(self):
         return len(self.images)
 
-    def collate_fn(self, batch):  # 这个有点没懂...？？？...
+    def collate_fn(self, batch):  # 这里应该能自己调用，暂时先理解到这
         """
         collate_fn:如何将多个样本数据拼接成一个batch,一般使用默认的拼接方式即可，综合一系列的样本从而形成一个mini-batch张量
 
