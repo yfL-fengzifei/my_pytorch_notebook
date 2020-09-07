@@ -235,7 +235,7 @@ def find_jaccard_overlop(set_1,set_2):
     #计算IOU
     return intersection/union
 
-
+#计算IOU相当重要，要反复琢磨
 def find_intersection(set_1,set_2):
     """
     计算交集
