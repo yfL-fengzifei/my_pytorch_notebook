@@ -100,6 +100,7 @@ def expand(image,boxes,filler):
     """
 
     #计算原始图像维度
+    #因为这里之前被to_tensor所以传入是tensor(n,h,w)
     original_h=image.size(1)
     original_w=image.size(2)
 
@@ -119,7 +120,7 @@ def expand(image,boxes,filler):
     right=left+original_w
     top=random.randint(0,new_h-original_h)
     bottom=top+original_h
-    new_image[:,top:bottom,left:right]=image
+    new_image[:,top:bottom,left:right]=image #(3,h,w)
 
     #根据新图像调整bbox坐标
     new_boxes=boxes+torch.FloatTensor([left,top,left,top]).unsqueeze(0) #bbox原始边界形式为[xmin,ymin,xmax,ymax]，最终得到new_boxes还是(n_objects,4)
@@ -138,6 +139,7 @@ def random_crop(image,boxes,labels,difficulties):
     return: 返回裁切后的图像，更新Bbox坐标、标签、难易程度
     """
     #计算原始图像维度
+    #这里还是因为tensor
     original_h=image.size(1)
     original_w=image.size(2)
 
@@ -147,8 +149,8 @@ def random_crop(image,boxes,labels,difficulties):
         min_overlap=random.choice([0.,.1,.3,.5,.7,.9,None]) #None表示不进行裁切 #random.choice() 从元组或列表中随机选择一项
 
         #如果不进行裁切
-        if min_overlap==None:
-            return image,boxes,labels,difficulties
+        if min_overlap is None:
+            return image,boxes,labels,difficulties #结束while
 
         #在该经过选择后的min_overlap下记性五十次的尝试
         #该过程在文章中并没有设计，但是在作者的源码中有所呈现
@@ -168,15 +170,16 @@ def random_crop(image,boxes,labels,difficulties):
             #横纵比应该在[0.5,2]之间
             aspect_ratio=new_h/new_w #这里是高比宽
             if not 0.5<aspect_ratio<2:
-                continue
+                continue #跳出for
 
             #裁切维度
+            #相当于随机选择放在原始图像的哪个位置
             left=random.randint(0,original_w-new_w)
             right=left+new_w
             top=random.randint(0,original_h-new_h)
             bottom=top+new_h
             crop=torch.FloatTensor([left,top,right,bottom])
-            #这里返回的[left,top,right,bottom]的坐标基准还是原始图像
+            #这里返回的[left,top,right,bottom]的坐标基准还是原始图像，返回的是新的缩小后的图像
 
             #计算crop和bbox之间的IOU
             overlop=find_jaccard_overlop(crop.unsqueeze(0),boxes) #crop.unsqueeze(0)变成(1,4),然后与该原始图像下的bboxes计算IOU，find_jaccard_overlap返回的维度是(n1,n2)，这里实际上是(1,n_objects)
@@ -206,7 +209,7 @@ def random_crop(image,boxes,labels,difficulties):
             #这里同时将超出裁切后的图像的Bbox边界做了裁切
             new_boxes[:,:2]=torch.max(new_boxes[:,:2],crop[:2])
             new_boxes[:,:2]-=crop[:2]
-            new_boxes[:,2:]=torch.min(new_boxes[:,:2],crop[:2])
+            new_boxes[:,2:]=torch.min(new_boxes[:,2:],crop[2:])
             new_boxes[:,2:]-=crop[:2]
 
             return new_image,new_boxes,new_labels,new_difficulties
@@ -263,8 +266,8 @@ def flip(image,boxes):
     #翻转bbox
     #减一可能是跟算法有关，不懂...???...
     new_boxes=boxes
-    new_boxes[:,:2]=image.width-boxes[:,0]-1
-    new_boxes[:,2:]=image.height-boxes[:,2]-1
+    new_boxes[:,0]=image.width-boxes[:,0]-1
+    new_boxes[:,2]=image.height-boxes[:,2]-1
     new_boxes=new_boxes[:,[2,1,0,3]]
 
     return new_image,new_boxes
@@ -303,6 +306,8 @@ def transform(image,boxes,labels,difficulties,split):
     return: 返回转换后的图像、bbox坐标、标签、难易度
     """
 
+    assert split in {'TRAIN','TEST'}
+
     #均值、标准差
     #均值和标准差是利用ImageNet计算得来的，文章使用的VGG基础网络，就是使用的ImageNet data进行的预训练
     mean=[0.485,0.456,0.406]
@@ -337,12 +342,13 @@ def transform(image,boxes,labels,difficulties,split):
         #将图像缩放到网络定义的需要的尺寸，并将bbox从绝对边界坐标形式，变成分数形式
         new_image,new_boxes=resize(new_image,new_boxes,dims=(300,300))
 
-        #转换为PIL图像
-        new_image=FT.to_pil_image(new_image)
+        #转换为tensor图像
+        #为什么又转换一遍...???...
+        new_image=FT.to_tensor(new_image)
 
         #利用ImageNet data数据中的均值的标准差进行归一化
         #上述预先定义的均值和标准差，仅在放大的pad中使用到了mean
-        #归一化时在PIL图像上进行得到
+        #归一化时在tensor图像上
         new_image=FT.normalize(new_image,mean=mean,std=std)
 
         return new_image,new_boxes,new_labels,new_difficulties
