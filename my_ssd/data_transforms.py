@@ -235,7 +235,7 @@ def find_jaccard_overlop(set_1,set_2):
     #计算IOU
     return intersection/union
 
-#计算IOU相当重要，要反复琢磨
+
 def find_intersection(set_1,set_2):
     """
     计算交集
@@ -328,19 +328,21 @@ def transform(image,boxes,labels,difficulties,split):
 
         #缩放图像，概率50%，有助于检测小目标
         #利用ImageNet data数据的均值来填充周围的空间
-        if random.random<0.5:
+        if random.random()<0.5:
             new_image,new_boxes=expand(new_image,boxes,filler=mean) #这里的mean是上述ImageNet data归一化时使用的通道均值
 
         #值得注意的是，该图像可能进行放大，但是必经过裁切
         #随机裁切图像()缩小
         new_image,new_boxes,new_labels,new_difficulties=random_crop(new_image,new_boxes,new_labels,new_difficulties)
 
+        new_image=FT.to_pil_image(new_image)
+
         #翻转图像，概率50%
         if random.random()<0.5:
             new_image,new_boxes=flip(new_image,new_boxes)
 
         #将图像缩放到网络定义的需要的尺寸，并将bbox从绝对边界坐标形式，变成分数形式
-        new_image,new_boxes=resize(new_image,new_boxes,dims=(300,300))
+        new_image,new_boxes=resize(new_image,new_boxes,dim=(300,300))
 
         #转换为tensor图像
         #为什么又转换一遍...???...
