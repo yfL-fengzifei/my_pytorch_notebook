@@ -136,5 +136,31 @@ class SSD300(nn.Module):
         pass
 
 # if __name__=='__main__':
-#     ssd300=SSD300(20)
-#     print(ssd300)
+# ssd300 = SSD300(20)
+# print(ssd300)
+# # for name,param in ssd300.named_parameters():
+# #     print(name)
+# # 查看参数
+# biases = list()
+# not_biases = list()
+# for param_name, param in ssd300.named_parameters():
+#     # print(param_name,param.size())
+#     if param.requires_grad:
+#         if param_name.endswith('.bias'):
+#             biases.append(param)
+#         else:
+#             not_biases.append(param)
+#
+# lr = 1e-3
+#
+# momentum = 0.9
+#
+# weight_decay = 5e-4
+#
+# # optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * lr}, {'params': not_biases}], lr=lr,
+# #                             momentum=momentum, weight_decay=weight_decay)
+# optimizer = torch.optim.SGD(params=ssd300.parameters(), lr=lr,
+#                             momentum=momentum, weight_decay=weight_decay)
+#
+# # 优化器是按组输出的，根据你的设置有关
+# print(optimizer)
