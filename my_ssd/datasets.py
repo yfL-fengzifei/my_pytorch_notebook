@@ -73,6 +73,7 @@ class PascalVOCDataset(Data.Dataset):
             difficulties = difficulties[1 - difficulties]
 
         # 应用转换
+        # 返回的都是tensor
         image, boxes, labels, difficulties = transform(image, boxes, labels, difficulties, split=self.split)
 
         return image, boxes, labels, difficulties  # 返回的是一张图像、及其图像中对应的objects
@@ -82,6 +83,10 @@ class PascalVOCDataset(Data.Dataset):
 
     def collate_fn(self, batch):  # 这里应该能自己调用，暂时先理解到这
         """
+
+        #这里需要注意的是，当仅实例化为datasets的时候，如上述一样，返回的是全部是tensor，但是仅属于一个样本对应的objects
+        #当利用DataLoader创建batch-data时，返回的是batch_size图像，仅有图像还是tensor，而其他三个返回的是具有batch_size的list，每个list是tensor
+
         collate_fn:如何将多个样本数据拼接成一个batch,一般使用默认的拼接方式即可，综合一系列的样本从而形成一个mini-batch张量
 
         因为每个图像包含不同数量的目标，因此需要一个整理功能(传入到DataLoader中)
