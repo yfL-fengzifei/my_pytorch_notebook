@@ -63,13 +63,15 @@ params=list(net.parameters())
 for name,parameter in net.named_parameters():
     pass
 for parameter in net.parameters()
+值得注意的是，模型的可学习参数包含在model.parameters()
+
 
 对于 子Module 中的parameter，会其名字之前加上当前Module的名字。如对于`self.sub_module = SubModel()`，SubModel中有个parameter的名字叫做param_name，
 那么二者拼接而成的parameter name 就是`sub_module.param_name`
 
 list(layer.parameters())
 
-查看参数的长度
+#查看参数的长度
 print(len(params))
 
 对于参数parameters,可以使用for param in module.parameters()来遍历网络模型中的参数，因为该函数返回的是一个迭代器iterator。在使用优化算法的时候就是讲model.parameters()传给Optimizer，与之类似的还有函数buffers、children、modules
@@ -81,6 +83,10 @@ for name,modle in model.named_modules()
 
 #使用state_dict来访问所有的参数
 state_dict的作用是返回一个包含module的所有state的dictionary，而这个字典的keys对应的是parameter和buffer的名字names。(该函数的源码部分有一个循环可以递归遍历Module中所有的SubModule)
+state_dict是一个简化版的python字典对象，其将每一层映射为对应的参数tensor。值得注意的是，只有包含可学习参数的网络层(卷积层、线性层等)或者是bn,会出现在state_dict中。
+优化器也有一个state_dict,其包含优化器的状态信息，以及使用的超参数
+因为state_dict是一个python字典，可以轻松的被保存、更新、迭代、恢复、并被pytorch模型和优化器添加大量的模块。
+
 import torch
 import torch.nn as nn
 #net=nn.certain_module()
@@ -95,7 +101,9 @@ net2=nn.Sequential(nn.Linear(2,2),nn.Linear(2,2))
 print(net2.state_dict())
 #查看键值
 print(net2.state_dict().keys())
-
+#循环查看
+for name in model.state_dict():
+    print(name,model.state_dict()[name],model.state_dict()[name].size())
 """
 
 """
@@ -166,7 +174,7 @@ print(net2.state_dict())
 print(net2.state_dict().keys())
 #循环查看
 for name in model.state_dict():
-    print(name,model.state_dict()[name]m,model.state_dict()[name].size())
+    print(name,model.state_dict()[name],model.state_dict()[name].size())
 """
 
 
@@ -307,6 +315,14 @@ optimizer有一个参数组的性质
 optimizer.param_groups；只有在nn.Sequential()和nn.ModuleList的情况下才会可能有多个组,在class中也可以使用sequential 和ModuleList
 方法1：就该optimizer.param_groups中对应的学习率，（不推荐）
 方法2：新建一个优化器，由于optimizer十分轻量级，构建开销很小，因此可以创建一个optimizer，但是后者对于使用动量的优化器Adam,会丢失动量等状态信息，可能会造成损失函数的收敛出现震荡等情况，...???...没懂
+
+#优化器的保存
+优化器也有一个state_dict,其包含优化器的状态信息，以及使用的超参数
+optimizer=optim.SGD()
+for var_name in optimizer.state_dict()
+    print(var_name,'\t',optimizer.state_dict()[var_name])
+#这里还有一个参数组的概念
+optimizer.state_dict()['param_groups']
 """
 
 
@@ -349,6 +365,8 @@ init.constant_(net.certain_layer.learnable_param,val=) 将参数设为常数，�
 # 已经训练好的net
 torch.save(net,'net.pkl')
 net2=torch.load('net.pkl')
+#尽量不要使用这种方式，因为这种方式并没有保存模型本身，而是保存的是路径
+
 
 法二：
 # 只保留计算图中节点的参数，效果更快
@@ -358,6 +376,7 @@ torch.save(net.state_dict(),'net_param.pkl')
 class pass
 net3=Net()
 net3.load_state_dict(torch.load('net_param.pkl')) #load_state_dict的作用于state_dict的作用相反，将parameter和buffer加载到module和SubModule中
+#必须是先torch.load()，然后在load_state_dict，直接使用load_state_dict(path)不行
 
 #加载预训练模型
 import torchvision.models as models
@@ -382,6 +401,47 @@ my_net_dict.update(pretrained_dict)
 #加载真正的参数
 my_net._dictload_state_dict(my_net_dict)
 
+
+#保存和加载优化器
+model=Net()
+optimizer=optim.SGD()
+1、假设在某个epoch,要保存模型参数，优化器参数以及epoch
+先建立一个字典，保存三个参数
+state={'net':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch}
+torch.save(state,dir) #dir='path/model_save.pth'
+
+2、当想恢复某一阶段的训练(或者进行测试时)，那么就可以读取之前保存的网络模型参数等
+checkpint=torch.load(dir)
+model.load_state_dict(checkponit['net'])
+optimizer.load_state_dict(checkpoint['optimizer'])
+state_epoch=checkpoint['epoch']+1
+
+state_dict是一个简化版的python字典对象，其将每一层映射为对应的参数tensor。值得注意的是，只有包含可学习参数的网络层(卷积层、线性层等)或者是bn,会出现在state_dict中。
+优化器也有一个state_dict,其包含优化器的状态信息，以及使用的超参数
+
+3、测试
+值得注意的是，在进行推理之前，必须调用model.eval()来设置dropout和bn层
+
+#在推理和恢复训练的时候进行节点保存和加载
+torch.save({
+            'epoch':epoch,
+            'model_state_dict':model.state_dict(),
+            'optimizer_state_dict':optimizer.state_dict,
+            'loss':loss},path)
+model=certain_model()
+optimizer=certain_optimizer()
+checkpoint=torch.load(path)
+model.load_state_dict(checkpoint['model_state_dict'])
+optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+epoch=checkpoint['epoch']
+loss=checkpoint['loss']
+
+model.eval() 或者是model.train()
+在保存模型节点的时候，不仅仅是保存模型的state_dict,保存优化器的state_dict也是很重要的，因为其包含着缓存和参数。其他要保存的可能包括epoch,loss或其他等等
+将这些要保存的内容组织成字典，一般将节点保存为.tar的格式(官方说的是.tar而没说是.pth.tar)
+当要加载的时候，先使用torch.load,然后使用.load_state_dict
+
+#保存和加载多模型没看
 """
 
 
@@ -449,6 +509,8 @@ module(test_input)
 一般来说：
 调用module.train()函数，将当前module及其子module中的所有training属性设为True
 调用module.eval()函数将training属性都是设置为False
+
+值得注意的是，在进行推理之前，必须调用model.eval()来设置dropout和bn层
 """
 
 """
