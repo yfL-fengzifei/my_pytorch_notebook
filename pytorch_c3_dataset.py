@@ -108,7 +108,7 @@ transform.ToPILImage 将tensor转换成PILImage对象
 #值得注意的是上述的操作定义后都是以函数的形式存在的，需要二次调用
 #值得注意的是因为像素值在[0,255]，所以刚好是uint8所能表示的范围，包括transforms.ToTensor在内的一些关于图片的函数就默认输入是uint8类型，若不是，可能不会报错，但是可能得不到想要的效果。因此，如果用像素值(0-255整数)表示图片数据，那么一律将其类型设置成uint8，避免不必要的bug，见文档中的博客
 
-transforms.Normalize(mean,std,inplace_Fasle) 逐channel的对图像进行标准化，（归一化RGB的均值和方差）
+transforms.Normalize(mean,std,inplace_Fasle) 逐channel的对图像进行标准化，（归一化RGB的均值和方差），最终变成的是[-1,1]之间的数值
 output=(input-mean)/std 加速模型收敛
 
 ‘bilibili-pytorch框架’有一个逆transforms_invert的函数
