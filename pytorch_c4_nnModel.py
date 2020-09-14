@@ -430,6 +430,7 @@ torch.save({
             'loss':loss},path)
 model=certain_model()
 optimizer=certain_optimizer()
+
 checkpoint=torch.load(path)
 model.load_state_dict(checkpoint['model_state_dict'])
 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -441,7 +442,24 @@ model.eval() 或者是model.train()
 将这些要保存的内容组织成字典，一般将节点保存为.tar的格式(官方说的是.tar而没说是.pth.tar)
 当要加载的时候，先使用torch.load,然后使用.load_state_dict
 
-#保存和加载多模型没看
+#保存和加载多模型没看，见官方文档
+
+#一些模型保存的代码
+#保存
+checkpoint={'model_state_dict':model.state_dict(),
+            'optimizer':optimizer.state_dict(),
+            'epoch':epoch}
+if not os.path.isdir('./path') #判断path(需要提供绝对路径)是否为目录，如果不是目录
+    os.mkdir('./path') #创建一个文件夹
+torch.save(checkpoint,'./path/checkpoint_node_%s.pth'%(str(epoch))) #每次历元保存一次节点
+#加载
+if RESUME:
+    path_chechkpoint='./path/certain_checkpoint.pth'
+    checkpoint=torch.load(path_checkpoint)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    start_epoch=checkpoint['epoch']+1
+#如何保存每个epoch中的最优的参数...???...
 """
 
 
