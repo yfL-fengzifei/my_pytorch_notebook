@@ -341,19 +341,20 @@ def transform(image,boxes,labels,difficulties,split):
         if random.random()<0.5:
             new_image,new_boxes=flip(new_image,new_boxes)
 
-        #将图像缩放到网络定义的需要的尺寸，并将bbox从绝对边界坐标形式，变成分数形式
-        new_image,new_boxes=resize(new_image,new_boxes,dim=(300,300))
+    #无论是train还是test,都进行一下操作，test不进行数据增强，只进行缩放和归一化
+    #将图像缩放到网络定义的需要的尺寸，并将bbox从绝对边界坐标形式，变成分数形式
+    new_image,new_boxes=resize(new_image,new_boxes,dim=(300,300))
 
-        #转换为tensor图像
-        #为什么又转换一遍...???...
-        new_image=FT.to_tensor(new_image)
+    #转换为tensor图像
+    #为什么又转换一遍...???...
+    new_image=FT.to_tensor(new_image)
 
-        #利用ImageNet data数据中的均值的标准差进行归一化
-        #上述预先定义的均值和标准差，仅在放大的pad中使用到了mean
-        #归一化时在tensor图像上
-        new_image=FT.normalize(new_image,mean=mean,std=std)
+    #利用ImageNet data数据中的均值的标准差进行归一化
+    #上述预先定义的均值和标准差，仅在放大的pad中使用到了mean
+    #归一化时在tensor图像上
+    new_image=FT.normalize(new_image,mean=mean,std=std)
 
-        return new_image,new_boxes,new_labels,new_difficulties
+    return new_image,new_boxes,new_labels,new_difficulties
 
 
 
